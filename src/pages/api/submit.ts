@@ -66,8 +66,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   const supabase = createClient(
-    import.meta.env.PUBLIC_SUPABASE_URL,
-    import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+    locals.runtime.env.PUBLIC_SUPABASE_URL,
+    locals.runtime.env.SUPABASE_SERVICE_ROLE_KEY,
     { global: { headers: { Authorization: `Bearer ${token}` } } },
   );
 

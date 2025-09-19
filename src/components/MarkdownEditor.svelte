@@ -162,8 +162,19 @@
     try {
       const newArticle = await publishArticle(user, title, content);
       updateStep(2, "success");
+
+      modalSteps = [
+        ...modalSteps,
+        { text: "Terminating temporary session...", status: "pending" },
+      ];
+      await new Promise((res) => setTimeout(res, 500));
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) {
+        console.error("Error signing out temporary user:", signOutError);
+      }
+      updateStep(3, "success");
       modalFinalMessage =
-        "You have posted anonymously. This account is temporary and cannot be recovered. To post under the same name, please sign up.";
+        "You have posted anonymously and have been logged out. This account was temporary and cannot be recovered. To create a permanent identity, please sign up.";
       
       setTimeout(() => {
         window.location.href = `/article/${newArticle.slug}`;

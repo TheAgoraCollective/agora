@@ -36,6 +36,14 @@
     editor?.toTextArea();
   });
 
+  function getWordCount(mde: EasyMDE): number {
+    const content = mde.value();
+    if (!content) {
+      return 0;
+    }
+    return content.trim().split(/\s+/).filter(Boolean).length;
+  }
+
   const handleSubmit = async (event: SubmitEvent) => {
     isSubmitting = true;
     feedbackMessage = "";
@@ -50,7 +58,8 @@
       return;
     }
 
-    const wordCount = editor.wordCount();
+    const wordCount = getWordCount(editor);
+
     if (wordCount < 250 || wordCount > 2500) {
       feedbackMessage = `Your article must be between 250 and 2500 words. You currently have ${wordCount} words.`;
       isSubmitting = false;

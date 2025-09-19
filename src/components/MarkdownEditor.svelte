@@ -151,7 +151,7 @@
   <h1 class="text-4xl font-bold mb-4">Create New Article</h1>
 
   <form on:submit|preventDefault={handleSubmit} bind:this={formElement}>
-    <div class="hidden-field" aria-hidden="true">
+    <div class="honey-pot" aria-hidden="true">
       <label for="user_nickname">Nickname</label>
       <input type="text" id="user_nickname" name="user_nickname" tabindex="-1" autocomplete="off">
     </div>
@@ -172,7 +172,7 @@
     
     <textarea id="markdown-editor" name="content"></textarea>
 
-    <div class="mt-4 p-3 rounded-lg bg-blue-900/50 text-blue-200 text-sm text-center">
+    <div class="mt-4 p-3 rounded-lg bg-blue-900_50 text-blue-200 text-sm text-center">
       <strong>Note:</strong> All submissions are checked by an AI for harmful content. This may add a few seconds to the publishing time.
     </div>
 
@@ -187,9 +187,14 @@
 </div>
 
 <style>
-  .hidden-field {
+  .honey-pot {
     display: none;
   }
+
+  .bg-blue-900_50 {
+    background-color: rgba(30, 58, 138, 0.5);
+  }
+
   :global(.EasyMDEContainer .CodeMirror) {
     position: relative;
     background-color: #111827;

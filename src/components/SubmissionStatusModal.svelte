@@ -37,8 +37,7 @@
         {/each}
       </ul>
 
-      {#if finalMessage}
-        <div class="mt-6 p-4 rounded-lg text-center" class:bg-red-900/50={isError} class:text-red-300={isError} class:bg-blue-900/50={!isError} class:text-blue-200={!isError}>
+      {#if finalMessage}<div class="mt-6 p-4 rounded-lg text-center" class:bg-red-900_50={isError} class:text-red-300={isError} class:bg-blue-900_50={!isError} class:text-blue-200={!isError}>
           <p class="font-bold text-lg">{finalMessageTitle}</p>
           <p>{finalMessage}</p>
           <div class="mt-4">
@@ -57,3 +56,12 @@
     </div>
   </div>
 {/if}
+
+<style>
+  .bg-red-900_50 {
+    background-color: rgba(127, 29, 29, 0.5);
+  }
+  .bg-blue-900_50 {
+    background-color: rgba(30, 58, 138, 0.5);
+  }
+</style>

@@ -18,6 +18,9 @@
   let modalFinalMessage = "";
   let modalHasError = false;
 
+  let honeypot = "";
+  const pageLoadTime = Date.now();
+
   const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL as string;
   const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY as string;
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -162,19 +165,8 @@
     try {
       const newArticle = await publishArticle(user, title, content);
       updateStep(2, "success");
-
-      modalSteps = [
-        ...modalSteps,
-        { text: "Terminating temporary session...", status: "pending" },
-      ];
-      await new Promise((res) => setTimeout(res, 500));
-      const { error: signOutError } = await supabase.auth.signOut();
-      if (signOutError) {
-        console.error("Error signing out temporary user:", signOutError);
-      }
-      updateStep(3, "success");
       modalFinalMessage =
-        "You have posted anonymously and have been logged out. This account was temporary and cannot be recovered. To create a permanent identity, please sign up.";
+        "You have posted anonymously. This account is temporary and cannot be recovered. To post under the same name, please sign up.";
       
       setTimeout(() => {
         window.location.href = `/article/${newArticle.slug}`;
@@ -193,6 +185,17 @@
   };
 
   const handleSubmit = async () => {
+    if (honeypot) {
+      console.log("Bot submission detected (honeypot).");
+      return;
+    }
+
+    const timeElapsed = Date.now() - pageLoadTime;
+    if (timeElapsed < 60 * 1000) {
+      console.log("Bot submission detected (too fast).");
+      return;
+    }
+
     isSubmitting = true;
     feedbackMessage = "";
     feedbackType = "error";
@@ -249,6 +252,11 @@
       />
     </div>
 
+    <div class="honeypot" aria-hidden="true">
+      <label for="user-real-name">Do not fill this out</label>
+      <input type="text" id="user-real-name" name="user-real-name" tabindex="-1" autocomplete="off" bind:value={honeypot} />
+    </div>
+
     <textarea id="markdown-editor"></textarea>
 
     <button
@@ -272,6 +280,11 @@
 </div>
 
 <style>
+  .honeypot {
+    position: absolute;
+    left: -9999px;
+    opacity: 0;
+  }
   :global(.EasyMDEContainer .CodeMirror) {
     position: relative;
     background-color: #111827;

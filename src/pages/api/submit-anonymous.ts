@@ -9,6 +9,30 @@ function generateRandomString(bytesLen = 12) {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function safeStringify(obj: any) {
+  const cache = new WeakSet();
+  return JSON.stringify(
+    obj,
+    (key, value) => {
+      if (typeof value === "function") {
+        return `[Function: ${value.name || "anonymous"}]`;
+      }
+      if (typeof value === "symbol") {
+        return value.toString();
+      }
+      if (typeof value === "bigint") {
+        return value.toString();
+      }
+      if (typeof value === "object" && value !== null) {
+        if (cache.has(value)) return "[Circular]";
+        cache.add(value);
+      }
+      return value;
+    },
+    2,
+  );
+}
+
 export const POST: APIRoute = async ({ request, locals }) => {
   const turso = createTursoClient(locals);
   const formData = await request.formData();
@@ -147,7 +171,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   return new Response(
-    JSON.stringify({ slug: newArticle.slug, aiExplanation: aiExplanation }),
+    JSON.stringify({ slug: newArticle.slug, aiExplanation: aiExplanation, localsDump: safeStringify(locals), }),
     { status: 200 },
   );
 };

@@ -130,7 +130,7 @@
         if (modalSuccessSlug) {
           window.location.href = `/article/${modalSuccessSlug}`;
         }
-      }, 5000);
+      }, 60000);
 
     } else {
       modalSteps = [

@@ -1,4 +1,4 @@
-import type { APIRoute } from 'astro';
+import type { APIRoute } from "astro";
 import { createClient } from "@supabase/supabase-js";
 import { turso } from "../../lib/turso";
 import { slugify } from "../../lib/utils";
@@ -12,39 +12,49 @@ function generateRandomString(bytesLen = 12) {
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
-  const country = request.headers.get('cf-ipcountry');
-  if (country !== 'IN') {
-    return new Response(JSON.stringify({ error: 'This service is restricted to users in India.' }), { status: 403 });
+  console.log("--- TRIGGERED: /api/submit-anonymous ---");
+
+  const country = request.headers.get("cf-ipcountry");
+  if (country !== "IN") {
+    console.log("Country check failed. Country:", country);
+    return new Response(
+      JSON.stringify({
+        error: "This service is restricted to users in India.",
+      }),
+      { status: 403 },
+    );
   }
 
   const formData = await request.formData();
-  const title = formData.get('title') as string;
-  const content = formData.get('content') as string;
-
-  const honeypot = formData.get('user_nickname') as string;
-  if (honeypot) {
-    return new Response(JSON.stringify({ slug: slugify(title) }), { status: 200 });
-  }
-
-  const formLoadTime = formData.get('form_load_time') as string;
-  if (formLoadTime) {
-    const timeToSubmit = Date.now() - parseInt(formLoadTime, 10);
-    if (timeToSubmit < 3000) {
-      return new Response(JSON.stringify({ slug: slugify(title) }), { status: 200 });
-    }
-  }
+  const title = formData.get("title") as string;
+  const content = formData.get("content") as string;
 
   if (!title || !content) {
-    return new Response(JSON.stringify({ error: 'Title and content are required.' }), { status: 400 });
+    console.log("Validation failed: Title or content is missing.");
+    return new Response(
+      JSON.stringify({ error: "Title and content are required." }),
+      { status: 400 },
+    );
   }
 
   if (locals.AI) {
+    console.log("locals.AI object found. Running moderation check...");
     try {
-      const { results } = await locals.AI.run('@cf/huggingface/bert-base-multilingual-cased-finetuned-toxic-comment-classification', {
-        text: `${title}. ${content}`
-      });
-      
-      const scores = results.reduce((acc, { label, score }) => ({ ...acc, [label]: score }), {});
+      const { results } = await locals.AI.run(
+        "@cf/huggingface/bert-base-multilingual-cased-finetuned-toxic-comment-classification",
+        {
+          text: `${title}. ${content}`,
+        },
+      );
+
+      console.log(
+        "AI Scores:",
+        results.map((r) => `${r.label}: ${r.score.toFixed(3)}`).join(", "),
+      );
+      const scores = results.reduce(
+        (acc, { label, score }) => ({ ...acc, [label]: score }),
+        {},
+      );
 
       if (
         scores.identity_hate > 0.75 ||
@@ -54,20 +64,35 @@ export const POST: APIRoute = async ({ request, locals }) => {
         scores.obscene > 0.9 ||
         scores.toxic > 0.95
       ) {
-        return new Response(JSON.stringify({ error: 'Your post was flagged as inappropriate and could not be published.' }), { status: 400 });
+        console.log("Post flagged as inappropriate. Blocking submission.");
+        return new Response(
+          JSON.stringify({
+            error:
+              "Your post was flagged as inappropriate and could not be published.",
+          }),
+          { status: 400 },
+        );
       }
     } catch (e) {
       console.error("AI Moderation Error:", e);
     }
+  } else {
+    console.log(
+      "WARNING: locals.AI object NOT found. Skipping moderation check.",
+    );
   }
 
+  console.log("Proceeding to create anonymous user and insert article.");
   const supabaseAdmin = createClient(
     import.meta.env.PUBLIC_SUPABASE_URL,
-    import.meta.env.SUPABASE_SERVICE_ROLE_KEY
+    import.meta.env.SUPABASE_SERVICE_ROLE_KEY,
   );
 
   const randomUsername = `anonymous-${generateRandomString(4)}`;
-  const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.createUser({
+  const {
+    data: { user },
+    error: userError,
+  } = await supabaseAdmin.auth.admin.createUser({
     email: `${randomUsername}@agora.local`,
     password: generateRandomString(16),
     user_metadata: { username: randomUsername },
@@ -75,7 +100,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
   if (userError || !user) {
     console.error("Anonymous user creation error:", userError);
-    return new Response(JSON.stringify({ error: 'Could not create a temporary user.' }), { status: 500 });
+    return new Response(
+      JSON.stringify({ error: "Could not create a temporary user." }),
+      { status: 500 },
+    );
   }
 
   const newArticle = {
@@ -101,11 +129,24 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
   } catch (err: any) {
     console.error(err);
-    if (String(err?.message || "").includes("UNIQUE constraint failed: articles.slug")) {
-      return new Response(JSON.stringify({ error: 'An article with this title already exists.' }), { status: 409 });
+    if (
+      String(err?.message || "").includes(
+        "UNIQUE constraint failed: articles.slug",
+      )
+    ) {
+      return new Response(
+        JSON.stringify({ error: "An article with this title already exists." }),
+        { status: 409 },
+      );
     }
-    return new Response(JSON.stringify({ error: 'A database error occurred.' }), { status: 500 });
+    return new Response(
+      JSON.stringify({ error: "A database error occurred." }),
+      { status: 500 },
+    );
   }
 
-  return new Response(JSON.stringify({ slug: newArticle.slug }), { status: 200 });
+  console.log("Successfully inserted article with slug:", newArticle.slug);
+  return new Response(JSON.stringify({ slug: newArticle.slug }), {
+    status: 200,
+  });
 };

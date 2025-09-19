@@ -1,4 +1,4 @@
-import type { APIRoute } from 'astro';
+import type { APIRoute } from "astro";
 import { createClient } from "@supabase/supabase-js";
 import { turso } from "../../lib/turso";
 import { slugify } from "../../lib/utils";
@@ -12,29 +12,50 @@ function generateRandomString(bytesLen = 4) {
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
-  const country = request.headers.get('cf-ipcountry');
-  if (country !== 'IN') {
-    return new Response(JSON.stringify({ error: 'This service is restricted to users in India.' }), { status: 403 });
+  console.log("--- TRIGGERED: /api/submit ---");
+
+  const country = request.headers.get("cf-ipcountry");
+  if (country !== "IN") {
+    console.log("Country check failed. Country:", country);
+    return new Response(
+      JSON.stringify({
+        error: "This service is restricted to users in India.",
+      }),
+      { status: 403 },
+    );
   }
-  
+
   const formData = await request.formData();
-  const title = formData.get('title') as string;
-  const content = formData.get('content') as string;
-  const token = request.headers.get('Authorization')?.split(' ')[1];
+  const title = formData.get("title") as string;
+  const content = formData.get("content") as string;
+  const token = request.headers.get("Authorization")?.split(" ")[1];
 
   if (!title || !content) {
-    return new Response(JSON.stringify({ error: 'Title and content are required.' }), { status: 400 });
+    console.log("Validation failed: Title or content is missing.");
+    return new Response(
+      JSON.stringify({ error: "Title and content are required." }),
+      { status: 400 },
+    );
   }
 
   if (locals.AI) {
+    console.log("locals.AI object found. Running moderation check...");
     try {
-      const { results } = await locals.AI.run('@cf/huggingface/bert-base-multilingual-cased-finetuned-toxic-comment-classification', {
-        text: `${title}. ${content}`
-      });
-      
-      console.log('AI Scores:', results.map(r => `${r.label}: ${r.score.toFixed(3)}`).join(', '));
+      const { results } = await locals.AI.run(
+        "@cf/huggingface/bert-base-multilingual-cased-finetuned-toxic-comment-classification",
+        {
+          text: `${title}. ${content}`,
+        },
+      );
 
-      const scores = results.reduce((acc, { label, score }) => ({ ...acc, [label]: score }), {});
+      console.log(
+        "AI Scores:",
+        results.map((r) => `${r.label}: ${r.score.toFixed(3)}`).join(", "),
+      );
+      const scores = results.reduce(
+        (acc, { label, score }) => ({ ...acc, [label]: score }),
+        {},
+      );
 
       if (
         scores.identity_hate > 0.75 ||
@@ -44,23 +65,41 @@ export const POST: APIRoute = async ({ request, locals }) => {
         scores.obscene > 0.9 ||
         scores.toxic > 0.95
       ) {
-        return new Response(JSON.stringify({ error: 'Your post was flagged as inappropriate and could not be published.' }), { status: 400 });
+        console.log("Post flagged as inappropriate. Blocking submission.");
+        return new Response(
+          JSON.stringify({
+            error:
+              "Your post was flagged as inappropriate and could not be published.",
+          }),
+          { status: 400 },
+        );
       }
     } catch (e) {
       console.error("AI Moderation Error:", e);
     }
+  } else {
+    console.log(
+      "WARNING: locals.AI object NOT found. Skipping moderation check.",
+    );
   }
 
+  console.log("Proceeding to authenticate user and insert article.");
   const supabase = createClient(
     import.meta.env.PUBLIC_SUPABASE_URL,
     import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
-    { global: { headers: { Authorization: `Bearer ${token}` } } }
+    { global: { headers: { Authorization: `Bearer ${token}` } } },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    return new Response(JSON.stringify({ error: 'Authentication failed. Please sign in again.' }), { status: 401 });
+    console.log("Authentication failed for token.");
+    return new Response(
+      JSON.stringify({ error: "Authentication failed. Please sign in again." }),
+      { status: 401 },
+    );
   }
 
   const newArticle = {
@@ -69,7 +108,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
     title: title.trim(),
     content,
     author_id: user.id,
-    author_display_name: user.user_metadata.username || `anonymous-${generateRandomString()}`,
+    author_display_name:
+      user.user_metadata.username || `anonymous-${generateRandomString()}`,
   };
 
   try {
@@ -86,11 +126,24 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
   } catch (err: any) {
     console.error(err);
-    if (String(err?.message || "").includes("UNIQUE constraint failed: articles.slug")) {
-      return new Response(JSON.stringify({ error: 'An article with this title already exists.' }), { status: 409 });
+    if (
+      String(err?.message || "").includes(
+        "UNIQUE constraint failed: articles.slug",
+      )
+    ) {
+      return new Response(
+        JSON.stringify({ error: "An article with this title already exists." }),
+        { status: 409 },
+      );
     }
-    return new Response(JSON.stringify({ error: 'A database error occurred.' }), { status: 500 });
+    return new Response(
+      JSON.stringify({ error: "A database error occurred." }),
+      { status: 500 },
+    );
   }
 
-  return new Response(JSON.stringify({ slug: newArticle.slug }), { status: 200 });
+  console.log("Successfully inserted article with slug:", newArticle.slug);
+  return new Response(JSON.stringify({ slug: newArticle.slug }), {
+    status: 200,
+  });
 };

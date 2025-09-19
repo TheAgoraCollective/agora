@@ -112,18 +112,25 @@
         { text: "Article published successfully!", status: "success" }
       ];
       modalFinalMessageTitle = "Success!";
+      
+      let baseMessage = "Your article is now live.";
       if (!session) {
-        modalFinalMessage = "You have posted anonymously. This temporary identity cannot be recovered.";
-      } else {
-        modalFinalMessage = "Your article is now live.";
+        baseMessage = "You have posted anonymously. This temporary identity cannot be recovered.";
       }
+      
+      if (result.aiExplanation) {
+        modalFinalMessage = `${baseMessage} AI Moderator note: "${result.aiExplanation}"`;
+      } else {
+        modalFinalMessage = baseMessage;
+      }
+      
       modalSuccessSlug = result.slug;
       
       setTimeout(() => {
         if (modalSuccessSlug) {
           window.location.href = `/article/${modalSuccessSlug}`;
         }
-      }, 4000);
+      }, 5000);
 
     } else {
       modalSteps = [
@@ -151,7 +158,7 @@
   <h1 class="text-4xl font-bold mb-4">Create New Article</h1>
 
   <form on:submit|preventDefault={handleSubmit} bind:this={formElement}>
-    <div class="honey-pot" aria-hidden="true">
+    <div class="hidden-field" aria-hidden="true">
       <label for="user_nickname">Nickname</label>
       <input type="text" id="user_nickname" name="user_nickname" tabindex="-1" autocomplete="off">
     </div>
@@ -187,14 +194,12 @@
 </div>
 
 <style>
-  .honey-pot {
+  .hidden-field {
     display: none;
   }
-
   .bg-blue-900_50 {
     background-color: rgba(30, 58, 138, 0.5);
   }
-
   :global(.EasyMDEContainer .CodeMirror) {
     position: relative;
     background-color: #111827;

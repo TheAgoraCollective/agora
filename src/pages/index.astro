@@ -2,21 +2,49 @@
 import Layout from '../layouts/Layout.astro';
 import ArticleList from '../components/ArticleList.svelte';
 import { turso } from "../lib/turso";
+import type { ArticleRow } from '../lib/types';
 
-const result = await turso.execute({
-  sql: "SELECT id, slug, title, author_display_name, upvotes, downvotes, created_at FROM articles ORDER BY created_at DESC LIMIT 50",
-  args: [],
-});
+const CACHE_KEY = "v1:articles:homepage";
+const CACHE_TTL_SECONDS = 120;
 
-const articles = result.rows.map(row => ({
-    id: row.id as string,
-    slug: row.slug as string,
-    title: row.title as string,
-    author_display_name: row.author_display_name as string,
-    upvotes: row.upvotes as number,
-    downvotes: row.downvotes as number,
-    created_at: row.created_at as string,
-}));
+let articles: ArticleRow[] = [];
+const kv = Astro.locals.AGORA_CACHE;
+
+if (kv) {
+  try {
+    const cachedArticles = await kv.get<ArticleRow[]>(CACHE_KEY, "json");
+    if (cachedArticles) {
+      articles = cachedArticles;
+    }
+  } catch (e) {
+    console.error("Failed to read from KV cache:", e);
+  }
+}
+
+if (articles.length === 0) {
+  const result = await turso.execute({
+    sql: "SELECT id, slug, title, author_display_name, upvotes, downvotes, created_at FROM articles ORDER BY created_at DESC LIMIT 50",
+    args: [],
+  });
+
+  articles = result.rows.map(row => ({
+      id: row.id as string,
+      slug: row.slug as string,
+      title: row.title as string,
+      author_display_name: row.author_display_name as string,
+      upvotes: row.upvotes as number,
+      downvotes: row.downvotes as number,
+      created_at: row.created_at as string,
+  }));
+
+  if (kv) {
+    Astro.locals.waitUntil(
+      kv.put(CACHE_KEY, JSON.stringify(articles), {
+        expirationTtl: CACHE_TTL_SECONDS,
+      })
+    );
+  }
+}
 ---
 
 <Layout title="Agora - Anonymous University News">
@@ -25,5 +53,4 @@ const articles = result.rows.map(row => ({
 	</h1>
 	
 	<ArticleList articles={articles} />
-
 </Layout>

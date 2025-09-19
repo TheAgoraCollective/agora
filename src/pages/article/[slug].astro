@@ -3,13 +3,6 @@ import Layout from "../../layouts/Layout.astro";
 import { turso } from "../../lib/turso";
 import { marked } from "marked";
 
-export async function getStaticPaths() {
-  const result = await turso.execute("SELECT slug FROM articles");
-  return result.rows.map((row) => ({
-    params: { slug: row.slug as string },
-  }));
-}
-
 const { slug } = Astro.params;
 
 const articleResult = await turso.execute({
@@ -24,7 +17,6 @@ if (!article) {
   return Astro.redirect("/404");
 }
 
-// Ensure headings/GFM render as expected
 marked.use({ gfm: true, breaks: false, headerIds: true, mangle: false });
 const htmlContent = marked.parse(article.content as string);
 

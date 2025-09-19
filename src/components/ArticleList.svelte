@@ -1,7 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { turso } from "../lib/turso";
-
   type Article = {
     id: string;
     slug: string;
@@ -12,34 +9,7 @@
     created_at: string;
   };
 
-  let articles: Article[] = [];
-  let isLoading = true;
-  let errorMessage = "";
-
-  onMount(async () => {
-    try {
-      const result = await turso.execute({
-        sql: "SELECT id, slug, title, author_display_name, upvotes, downvotes, created_at FROM articles ORDER BY created_at DESC",
-        args: [],
-      });
-
-      articles = result.rows.map((row) => ({
-        id: row.id as string,
-        slug: row.slug as string,
-        title: row.title as string,
-        author_display_name: row.author_display_name as string,
-        upvotes: row.upvotes as number,
-        downvotes: row.downvotes as number,
-        created_at: row.created_at as string,
-      }));
-
-    } catch (error) {
-      console.error(error);
-      errorMessage = "Failed to load articles. Please try again later.";
-    } finally {
-      isLoading = false;
-    }
-  });
+  export let articles: Article[] = [];
 
   function formatDate(dateString: string) {
     return new Date(dateString).toLocaleString('en-IN', {
@@ -50,11 +20,7 @@
 </script>
 
 <div class="space-y-4">
-  {#if isLoading}
-    <p class="text-center text-gray-400">Loading articles...</p>
-  {:else if errorMessage}
-    <p class="text-center text-red-400">{errorMessage}</p>
-  {:else if articles.length === 0}
+  {#if articles.length === 0}
     <div class="text-center py-10">
       <h2 class="text-2xl font-bold">No Articles Yet</h2>
       <p class="text-gray-400">Be the first to contribute to the conversation.</p>

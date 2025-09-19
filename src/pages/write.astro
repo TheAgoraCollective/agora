@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+import MarkdownEditor from '../components/MarkdownEditor.svelte';
+---
+
+<Layout title="Write an Article - Agora">
+  <MarkdownEditor client:only="svelte" />
+</Layout>

@@ -1,0 +1,90 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { turso } from "../../lib/turso";
+import { marked } from "marked";
+
+export async function getStaticPaths() {
+  const result = await turso.execute("SELECT slug FROM articles");
+  return result.rows.map((row) => ({
+    params: { slug: row.slug as string },
+  }));
+}
+
+const { slug } = Astro.params;
+
+const articleResult = await turso.execute({
+  sql:
+    "SELECT title, content, author_display_name, created_at FROM articles WHERE slug = ?",
+  args: [slug],
+});
+
+const article = articleResult.rows[0];
+
+if (!article) {
+  return Astro.redirect("/404");
+}
+
+// Ensure headings/GFM render as expected
+marked.use({ gfm: true, breaks: false, headerIds: true, mangle: false });
+const htmlContent = marked.parse(article.content as string);
+
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleString("en-IN", {
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+}
+---
+
+<Layout title={article.title as string}>
+  <article class="max-w-4xl mx-auto">
+    <header class="not-prose border-b border-gray-700 pb-4 mb-6">
+      <h1 class="mb-2 text-4xl font-bold text-gray-100">
+        {article.title}
+      </h1>
+      <p class="text-gray-400">
+        Posted by
+        <span class="font-medium text-gray-300">
+          {article.author_display_name}
+        </span>
+        on {formatDate(article.created_at as string)}
+      </p>
+    </header>
+
+    <div
+      class="prose prose-invert prose-lg"
+      set:html={htmlContent}
+    />
+  </article>
+</Layout>
+
+<style>
+  :global(.prose h1) {
+    margin: 1rem 0 0.75rem;
+    font-weight: 800;
+    font-size: 2rem;
+    line-height: 2rem;
+    color: #e5e7eb;
+  }
+  :global(.prose h2) {
+    margin: 0.875rem 0 0.5rem;
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    color: #e5e7eb;
+  }
+  :global(.prose h3) {
+    margin: 0.75rem 0 0.5rem;
+    font-weight: 700;
+    font-size: 1.25rem;
+    line-height: 2rem;
+    color: #e5e7eb;
+  }
+  :global(.prose h4) {
+    margin: 0.75rem 0 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: 2rem;
+    color: #e5e7eb;
+  }
+</style>

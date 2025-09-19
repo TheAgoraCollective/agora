@@ -68,6 +68,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
           .map((line) => line.trim())
           .filter(Boolean);
         const decision = lines[0] || "";
+        console.log(response);
         const explanation =
           lines[1] ||
           "Your post was flagged as inappropriate by our AI moderator.";

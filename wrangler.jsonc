@@ -1,14 +1,11 @@
 {
   "name": "agora",
   "pages_build_output_dir": "./dist",
-  "compatibility_date": "2024-03-20",
+  "compatibility_date": "2024-09-01",
   "kv_namespaces": [
     {
       "binding": "AGORA_CACHE",
       "id": "3b48a0f7f8cc43a8893fae5ac6f56343"
     }
   ],
-  "ai": {
-    "binding": "AI"
-  }
 }

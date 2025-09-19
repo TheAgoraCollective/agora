@@ -21,6 +21,19 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const title = formData.get('title') as string;
   const content = formData.get('content') as string;
 
+  const honeypot = formData.get('user_nickname') as string;
+  if (honeypot) {
+    return new Response(JSON.stringify({ slug: slugify(title) }), { status: 200 });
+  }
+
+  const formLoadTime = formData.get('form_load_time') as string;
+  if (formLoadTime) {
+    const timeToSubmit = Date.now() - parseInt(formLoadTime, 10);
+    if (timeToSubmit < 3000) {
+      return new Response(JSON.stringify({ slug: slugify(title) }), { status: 200 });
+    }
+  }
+
   if (!title || !content) {
     return new Response(JSON.stringify({ error: 'Title and content are required.' }), { status: 400 });
   }
@@ -30,8 +43,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
       const { results } = await locals.AI.run('@cf/huggingface/bert-base-multilingual-cased-finetuned-toxic-comment-classification', {
         text: `${title}. ${content}`
       });
-
-      console.log('AI Scores:', results.map(r => `${r.label}: ${r.score.toFixed(3)}`).join(', '));
       
       const scores = results.reduce((acc, { label, score }) => ({ ...acc, [label]: score }), {});
 

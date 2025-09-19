@@ -10,6 +10,7 @@
   let isSubmitting = false;
   let feedbackMessage = "";
   let feedbackType: "success" | "error" = "error";
+  let formLoadTime = Date.now();
 
   let showAnonymousModal = false;
   let modalSteps = [];
@@ -45,6 +46,13 @@
 
     if (!title || !content.trim()) {
       feedbackMessage = "Title and content cannot be empty.";
+      isSubmitting = false;
+      return;
+    }
+
+    const wordCount = editor.wordCount();
+    if (wordCount < 250 || wordCount > 2500) {
+      feedbackMessage = `Your article must be between 250 and 2500 words. You currently have ${wordCount} words.`;
       isSubmitting = false;
       return;
     }
@@ -108,6 +116,14 @@
   <h1 class="text-4xl font-bold mb-4">Create New Article</h1>
 
   <form on:submit|preventDefault={handleSubmit}>
+    <!-- HONEYPOT FIELD -->
+    <div class="hidden-field" aria-hidden="true">
+      <label for="user_nickname">Nickname</label>
+      <input type="text" id="user_nickname" name="user_nickname" tabindex="-1" autocomplete="off">
+    </div>
+
+    <input type="hidden" name="form_load_time" bind:value={formLoadTime} />
+    
     <div class="mb-4">
       <label for="title" class="block text-xl font-medium mb-2">Title</label>
       <input
@@ -139,6 +155,9 @@
 </div>
 
 <style>
+  .hidden-field {
+    display: none;
+  }
   :global(.EasyMDEContainer .CodeMirror) {
     position: relative;
     background-color: #111827;

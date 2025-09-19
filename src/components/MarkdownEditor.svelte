@@ -11,6 +11,7 @@
   let feedbackMessage = "";
   let feedbackType: "success" | "error" = "error";
   let formLoadTime = Date.now();
+  let formElement: HTMLFormElement;
 
   let showAnonymousModal = false;
   let modalSteps = [];
@@ -38,13 +39,11 @@
 
   function getWordCount(mde: EasyMDE): number {
     const content = mde.value();
-    if (!content) {
-      return 0;
-    }
+    if (!content) return 0;
     return content.trim().split(/\s+/).filter(Boolean).length;
   }
 
-  const handleSubmit = async (event: SubmitEvent) => {
+  const handleSubmit = async () => {
     isSubmitting = true;
     feedbackMessage = "";
     feedbackType = "error";
@@ -59,7 +58,6 @@
     }
 
     const wordCount = getWordCount(editor);
-
     if (wordCount < 250 || wordCount > 2500) {
       feedbackMessage = `Your article must be between 250 and 2500 words. You currently have ${wordCount} words.`;
       isSubmitting = false;
@@ -81,7 +79,6 @@
       modalSteps = [{ text: "Submitting anonymously...", status: "pending" }];
     }
     
-    const formElement = event.currentTarget as HTMLFormElement;
     const formData = new FormData(formElement);
     formData.set('content', content);
 
@@ -124,8 +121,7 @@
   <AnonymousPostModal bind:show={showAnonymousModal} bind:steps={modalSteps} bind:finalMessage={modalFinalMessage} bind:hasError={modalHasError} />
   <h1 class="text-4xl font-bold mb-4">Create New Article</h1>
 
-  <form on:submit|preventDefault={handleSubmit}>
-    <!-- HONEYPOT FIELD -->
+  <form on:submit|preventDefault={handleSubmit} bind:this={formElement}>
     <div class="hidden-field" aria-hidden="true">
       <label for="user_nickname">Nickname</label>
       <input type="text" id="user_nickname" name="user_nickname" tabindex="-1" autocomplete="off">

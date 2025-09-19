@@ -1,3 +1,4 @@
+html
 <script>
   import { createClient } from "@supabase/supabase-js";
   import { onMount } from "svelte";
@@ -11,7 +12,6 @@
   let menuOpen = false;
   let busy = false;
   let containerEl;
-  let tursoClient = null;
 
   const getDisplayName = (u) =>
     u?.user_metadata?.username ||
@@ -46,13 +46,6 @@
     menuOpen = !menuOpen;
   }
 
-  async function ensureTurso() {
-    if (tursoClient) return tursoClient;
-    const mod = await import("../lib/turso");
-    tursoClient = mod.turso;
-    return tursoClient;
-  }
-
   async function handleSignOut() {
     busy = true;
     await supabase.auth.signOut();
@@ -60,72 +53,41 @@
     window.location.href = "/";
   }
 
-  async function deleteAllPosts() {
-    if (!user) return;
-    if (
-      !confirm(
-        "Delete all your posts permanently? This cannot be undone."
-      )
-    )
-      return;
-    busy = true;
-    try {
-      const db = await ensureTurso();
-      await db.execute({
-        sql: "DELETE FROM articles WHERE author_id = ?",
-        args: [user.id],
-      });
-      alert("All your posts have been deleted.");
-    } catch (e) {
-      console.error(e);
-      alert("Failed to delete posts.");
-    } finally {
-      busy = false;
-      menuOpen = false;
-    }
-  }
-
-  function generateRandomString(bytesLen = 64) {
-    const bytes = new Uint8Array(bytesLen);
-    (globalThis.crypto || {}).getRandomValues
-      ? globalThis.crypto.getRandomValues(bytes)
-      : bytes.forEach((_, i) => (bytes[i] = Math.floor(Math.random() * 256)));
-    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-  }
-
   async function deleteAccount() {
     if (!user) return;
     if (
       !confirm(
-        "This will delete all your posts and revoke access to your account. Continue?"
+        "This will permanently delete your account and all of your posts. This action cannot be undone. Continue?"
       )
     )
       return;
+    
     busy = true;
     try {
-      const db = await ensureTurso();
-      await db.execute({
-        sql: "DELETE FROM articles WHERE author_id = ?",
-        args: [user.id],
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        throw new Error("Could not get user session. Please sign in again.");
+      }
+
+      const response = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.accessToken}`,
+        }
       });
-      const newPassword = generateRandomString(20);
-      const newEmail = `${getDisplayName()}@agora.deleted`;
-      const response = await supabase.auth.updateUser({
-        email: newEmail,
-        password: newPassword,
-        data: {
-          account_deleted: true,
-          deleted_at: new Date().toISOString(),
-        },
-      });
-      console.log(response);
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'An unknown error occurred.');
+      }
+
+      alert("Your account has been successfully deleted.");
       await supabase.auth.signOut();
-      alert("Account deleted and posts deleted.");
-      // window.location.href = "/";
-      return;
+      window.location.href = "/";
+
     } catch (e) {
       console.error(e);
-      alert("Failed to delete account.");
+      alert(`Failed to delete account: ${e.message}`);
     } finally {
       busy = false;
       menuOpen = false;
@@ -192,20 +154,11 @@
             </li>
             <li>
               <button
-                class="w-full text-left px-4 py-2 hover:bg-gray-700 text-red-400"
-                on:click={deleteAllPosts}
-                disabled={busy}
-              >
-                Delete All Posts
-              </button>
-            </li>
-            <li>
-              <button
                 class="w-full text-left px-4 py-2 hover:bg-gray-700 text-red-500 font-semibold"
                 on:click={deleteAccount}
                 disabled={busy}
               >
-                Delete Account
+                Delete Account Permanently
               </button>
             </li>
           </ul>

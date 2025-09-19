@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { createClient } from "@supabase/supabase-js";
-import { turso } from "../../lib/turso";
+import { createTursoClient } from "../../lib/turso";
 import { slugify } from "../../lib/utils";
 
 function generateRandomString(bytesLen = 12) {
@@ -10,6 +10,19 @@ function generateRandomString(bytesLen = 12) {
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
+  const turso = createTursoClient(locals);
+  const formData = await request.formData();
+
+  const honeypot = formData.get("user_nickname") as string;
+  if (honeypot) {
+    return new Response(null, { status: 204 });
+  }
+
+  const formLoadTime = formData.get("form_load_time") as string;
+  if (formLoadTime && Date.now() - parseInt(formLoadTime, 10) < 3000) {
+    return new Response(null, { status: 204 });
+  }
+
   const country = request.headers.get("cf-ipcountry");
   if (country !== "IN") {
     return new Response(
@@ -20,13 +33,22 @@ export const POST: APIRoute = async ({ request, locals }) => {
     );
   }
 
-  const formData = await request.formData();
   const title = formData.get("title") as string;
   const content = formData.get("content") as string;
 
   if (!title || !content) {
     return new Response(
       JSON.stringify({ error: "Title and content are required." }),
+      { status: 400 },
+    );
+  }
+
+  const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
+  if (wordCount < 250 || wordCount > 2500) {
+    return new Response(
+      JSON.stringify({
+        error: `Your article must be between 250 and 2500 words.`,
+      }),
       { status: 400 },
     );
   }
@@ -40,8 +62,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
         prompt: `${systemPrompt}\n\n<user_text>\n${userText}\n</user_text>`,
       });
 
-      console.log("Llama Guard Raw Response:", response);
-
       if (response) {
         const lines = response
           .split("\n")
@@ -53,7 +73,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
           "Your post was flagged as inappropriate by our AI moderator.";
 
         if (decision.toLowerCase() === "unsafe") {
-          console.log(`Post flagged as unsafe. Reason: ${explanation}`);
           return new Response(JSON.stringify({ error: explanation }), {
             status: 400,
           });
@@ -65,8 +84,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   const supabaseAdmin = createClient(
-    import.meta.env.PUBLIC_SUPABASE_URL,
-    import.meta.env.SUPABASE_SERVICE_ROLE_KEY,
+    locals.runtime.env.PUBLIC_SUPABASE_URL,
+    locals.runtime.env.SUPABASE_SERVICE_ROLE_KEY,
   );
 
   const randomUsername = `anonymous-${generateRandomString(4)}`;

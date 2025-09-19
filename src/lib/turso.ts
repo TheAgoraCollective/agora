@@ -1,9 +1,19 @@
-import { createClient } from "@libsql/client";
+import { createClient, type Client } from "@libsql/client";
+import type { Locals } from "astro";
 
-const dbUrl = import.meta.env.PUBLIC_TURSO_DB_URL;
-const dbAuthToken = import.meta.env.PUBLIC_TURSO_DB_AUTH_TOKEN;
+export function createTursoClient(locals: Locals): Client {
+  const url = locals.runtime.env.PUBLIC_TURSO_DB_URL;
+  const authToken = locals.runtime.env.PUBLIC_TURSO_DB_AUTH_TOKEN;
 
-export const turso = createClient({
-  url: dbUrl,
-  authToken: dbAuthToken,
-});
+  if (!url) {
+    throw new Error("TURSO_DB_URL is not defined in environment variables");
+  }
+  if (!authToken) {
+    throw new Error("TURSO_DB_AUTH_TOKEN is not defined in environment variables");
+  }
+
+  return createClient({
+    url,
+    authToken,
+  });
+}

@@ -1,17 +1,22 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import { turso } from "../../lib/turso";
+import { createTursoClient } from "../../lib/turso";
 import { marked } from "marked";
 
 const { slug } = Astro.params;
+let article: any = null;
 
-const articleResult = await turso.execute({
-  sql:
-    "SELECT title, content, author_display_name, created_at FROM articles WHERE slug = ?",
-  args: [slug],
-});
-
-const article = articleResult.rows[0];
+try {
+  const turso = createTursoClient(Astro.locals);
+  const articleResult = await turso.execute({
+    sql:
+      "SELECT title, content, author_display_name, created_at FROM articles WHERE slug = ?",
+    args: [slug],
+  });
+  article = articleResult.rows[0];
+} catch (e) {
+  console.error("Database error on article page:", e);
+}
 
 if (!article) {
   return Astro.redirect("/404");

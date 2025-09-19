@@ -12,6 +12,11 @@ function generateRandomString(bytesLen = 12) {
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
+  const country = request.headers.get('cf-ipcountry');
+  if (country !== 'IN') {
+    return new Response(JSON.stringify({ error: 'This service is restricted to users in India.' }), { status: 403 });
+  }
+
   const formData = await request.formData();
   const title = formData.get('title') as string;
   const content = formData.get('content') as string;

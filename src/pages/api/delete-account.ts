@@ -1,9 +1,11 @@
 import type { APIRoute } from "astro";
 import { createClient } from "@supabase/supabase-js";
-import { turso } from "../../lib/turso";
+import { createTursoClient } from "../../lib/turso";
 
 export const POST: APIRoute = async ({ request, locals }) => {
+  const turso = createTursoClient(locals);
   const token = request.headers.get("Authorization")?.split(" ")[1];
+
   if (!token) {
     return new Response(JSON.stringify({ error: "Authentication required." }), {
       status: 401,

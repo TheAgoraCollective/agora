@@ -3,20 +3,20 @@
   import EasyMDE from "easymde";
   import "easymde/dist/easymde.min.css";
   import { createClient } from "@supabase/supabase-js";
-  import AnonymousPostModal from "./AnonymousPostModal.svelte";
+  import SubmissionStatusModal from "./SubmissionStatusModal.svelte";
 
   let articleTitle = "";
   let editor: EasyMDE;
   let isSubmitting = false;
-  let feedbackMessage = "";
-  let feedbackType: "success" | "error" = "error";
   let formLoadTime = Date.now();
   let formElement: HTMLFormElement;
 
-  let showAnonymousModal = false;
-  let modalSteps = [];
+  let showModal = false;
+  let modalSteps: { text: string; status: 'pending' | 'success' | 'error' }[] = [];
   let modalFinalMessage = "";
-  let modalHasError = false;
+  let modalFinalMessageTitle = "";
+  let modalIsError = false;
+  let modalSuccessSlug = "";
 
   const supabase = createClient(
     import.meta.env.PUBLIC_SUPABASE_URL,
@@ -43,40 +43,55 @@
     return content.trim().split(/\s+/).filter(Boolean).length;
   }
 
+  function resetModal() {
+    showModal = false;
+    modalSteps = [];
+    modalFinalMessage = "";
+    modalFinalMessageTitle = "";
+    modalIsError = false;
+    modalSuccessSlug = "";
+  }
+
   const handleSubmit = async () => {
     isSubmitting = true;
-    feedbackMessage = "";
-    feedbackType = "error";
+    resetModal();
+    showModal = true;
+    modalSteps = [{ text: "Validating post...", status: "pending" }];
 
     const content = editor.value();
     const title = articleTitle.trim();
 
     if (!title || !content.trim()) {
-      feedbackMessage = "Title and content cannot be empty.";
+      modalSteps = [{ text: "Validation failed", status: "error" }];
+      modalFinalMessageTitle = "Error";
+      modalFinalMessage = "Title and content cannot be empty.";
+      modalIsError = true;
       isSubmitting = false;
       return;
     }
 
     const wordCount = getWordCount(editor);
     if (wordCount < 250 || wordCount > 2500) {
-      feedbackMessage = `Your article must be between 250 and 2500 words. You currently have ${wordCount} words.`;
+      modalSteps = [{ text: "Validation failed", status: "error" }];
+      modalFinalMessageTitle = "Error";
+      modalFinalMessage = `Your article must be between 250 and 2500 words. You currently have ${wordCount} words.`;
+      modalIsError = true;
       isSubmitting = false;
       return;
     }
+
+    modalSteps = [
+      { text: "Validation complete", status: "success" },
+      { text: "AI content check in progress (this may take a moment)...", status: "pending" }
+    ];
 
     const { data: { session } } = await supabase.auth.getSession();
     
     let endpoint = '/api/submit-anonymous';
     let headers: Record<string, string> = {};
-
     if (session) {
       endpoint = '/api/submit';
       headers['Authorization'] = `Bearer ${session.accessToken}`;
-    } else {
-      showAnonymousModal = true;
-      modalHasError = false;
-      modalFinalMessage = "";
-      modalSteps = [{ text: "Submitting anonymously...", status: "pending" }];
     }
     
     const formData = new FormData(formElement);
@@ -91,34 +106,48 @@
     const result = await response.json();
 
     if (response.ok) {
+      modalSteps = [
+        { text: "Validation complete", status: "success" },
+        { text: "AI content check passed", status: "success" },
+        { text: "Article published successfully!", status: "success" }
+      ];
+      modalFinalMessageTitle = "Success!";
       if (!session) {
-        modalSteps = [{ text: "Submitting anonymously...", status: "success" }];
         modalFinalMessage = "You have posted anonymously. This temporary identity cannot be recovered.";
-        setTimeout(() => {
-            window.location.href = `/article/${result.slug}`;
-        }, 4000);
       } else {
-        feedbackMessage = "Article published successfully! Redirecting...";
-        feedbackType = "success";
-        setTimeout(() => {
-          window.location.href = `/article/${result.slug}`;
-        }, 1500);
+        modalFinalMessage = "Your article is now live.";
       }
+      modalSuccessSlug = result.slug;
+      
+      setTimeout(() => {
+        if (modalSuccessSlug) {
+          window.location.href = `/article/${modalSuccessSlug}`;
+        }
+      }, 4000);
+
     } else {
-      if (!session) {
-        modalSteps = [{ text: "Submitting anonymously...", status: "error" }];
-        modalHasError = true;
-        modalFinalMessage = result.error || "An unexpected error occurred.";
-      } else {
-        feedbackMessage = result.error || "An unexpected error occurred while publishing.";
-      }
+      modalSteps = [
+        { text: "Validation complete", status: "success" },
+        { text: "AI content check failed", status: "error" }
+      ];
+      modalFinalMessageTitle = "Submission Blocked";
+      modalFinalMessage = result.error || "An unexpected error occurred while publishing.";
+      modalIsError = true;
       isSubmitting = false;
     }
   };
 </script>
 
 <div class="max-w-4xl mx-auto">
-  <AnonymousPostModal bind:show={showAnonymousModal} bind:steps={modalSteps} bind:finalMessage={modalFinalMessage} bind:hasError={modalHasError} />
+  <SubmissionStatusModal 
+    bind:show={showModal} 
+    steps={modalSteps} 
+    finalMessage={modalFinalMessage}
+    finalMessageTitle={modalFinalMessageTitle}
+    isError={modalIsError}
+    successSlug={modalSuccessSlug}
+    on:close={() => { isSubmitting = false; }}
+  />
   <h1 class="text-4xl font-bold mb-4">Create New Article</h1>
 
   <form on:submit|preventDefault={handleSubmit} bind:this={formElement}>
@@ -143,20 +172,18 @@
     
     <textarea id="markdown-editor" name="content"></textarea>
 
+    <div class="mt-4 p-3 rounded-lg bg-blue-900/50 text-blue-200 text-sm text-center">
+      <strong>Note:</strong> All submissions are checked by an AI for harmful content. This may add a few seconds to the publishing time.
+    </div>
+
     <button
       type="submit"
-      class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded disabled:bg-gray-500 text-lg"
+      class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded disabled:bg-gray-500 text-lg"
       disabled={isSubmitting}
     >
-      {isSubmitting ? "Publishing..." : "Publish Article"}
+      {isSubmitting ? "Processing..." : "Publish Article"}
     </button>
   </form>
-
-  {#if feedbackMessage}
-    <p class="mt-4 text-center text-lg {feedbackType === 'success' ? 'text-green-400' : 'text-red-400'}">
-      {feedbackMessage}
-    </p>
-  {/if}
 </div>
 
 <style>
